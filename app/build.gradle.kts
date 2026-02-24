@@ -103,6 +103,7 @@ android {
         create("release") {
             val localProperties = Properties()
             val localPropertiesFile = rootProject.file("local.properties")
+            var hasValidConfig = false
 
             if (localPropertiesFile.exists()) {
                 localProperties.load(FileInputStream(localPropertiesFile))
@@ -119,7 +120,18 @@ android {
                     storePassword = storePasswordValue
                     keyAlias = keyAliasValue
                     keyPassword = keyPasswordValue
+                    hasValidConfig = true
                 }
+            }
+            
+            // Fallback to debug keystore if release config is missing
+            if (!hasValidConfig) {
+                println("Release signing config missing, falling back to debug keystore")
+                val debugConfig = signingConfigs.getByName("debug")
+                storeFile = debugConfig.storeFile
+                storePassword = debugConfig.storePassword
+                keyAlias = debugConfig.keyAlias
+                keyPassword = debugConfig.keyPassword
             }
         }
     }
