@@ -176,20 +176,40 @@ class ChatService(
     // ---- Session 管理 ----
 
     private fun getOrCreateSession(conversationId: Uuid): ConversationSession {
-        return sessions.computeIfAbsent(conversationId) { id ->
+        // 先检查是否已存在
+        sessions[conversationId]?.let { return it }
+        
+        // 同步创建session，避免竞态条件
+        synchronized(this) {
+            // 双重检查
+            sessions[conversationId]?.let { return it }
+            
             val settings = settingsStore.settingsFlow.value
-            ConversationSession(
-                id = id,
-                initial = Conversation.ofId(
-                    id = id,
-                    assistantId = settings.getCurrentAssistant().id
-                ),
+            // 尝试从数据库加载已存在的会话，避免使用空白会话覆盖数据
+            val existingConversation = runCatching {
+                // 注意：这里使用runBlocking是为了同步获取数据库中的会话
+                // 这在session创建时是必要的，因为我们需要确保初始值正确
+                kotlinx.coroutines.runBlocking {
+                    conversationRepo.getConversationById(conversationId)
+                }
+            }.getOrNull()
+            
+            val initialConversation = existingConversation ?: Conversation.ofId(
+                id = conversationId,
+                assistantId = settings.getCurrentAssistant().id
+            )
+            
+            val session = ConversationSession(
+                id = conversationId,
+                initial = initialConversation,
                 scope = appScope,
                 onIdle = { removeSession(it) }
             ).also {
                 _sessionsVersion.value++
-                Log.i(TAG, "createSession: $id (total: ${sessions.size + 1})")
+                Log.i(TAG, "createSession: $conversationId (total: ${sessions.size + 1}), fromDb=${existingConversation != null}")
             }
+            sessions[conversationId] = session
+            return session
         }
     }
 
