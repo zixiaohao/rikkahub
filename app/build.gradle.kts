@@ -128,6 +128,32 @@ android {
             if (!hasValidConfig) {
                 println("Release signing config missing, falling back to debug keystore")
                 val debugConfig = signingConfigs.getByName("debug")
+                
+                // Ensure debug keystore exists in CI environments
+                val debugKeystore = debugConfig.storeFile
+                if (debugKeystore != null && !debugKeystore.exists()) {
+                    println("Debug keystore not found, creating one at ${debugKeystore.absolutePath}")
+                    debugKeystore.parentFile?.mkdirs()
+                    
+                    // Use keytool to generate a debug keystore
+                    try {
+                        val process = ProcessBuilder(
+                            "keytool", "-genkey", "-v",
+                            "-keystore", debugKeystore.absolutePath,
+                            "-storepass", "android",
+                            "-alias", "androiddebugkey",
+                            "-keypass", "android",
+                            "-keyalg", "RSA",
+                            "-keysize", "2048",
+                            "-validity", "10000",
+                            "-dname", "CN=Android Debug,O=Android,C=US"
+                        ).start()
+                        process.waitFor()
+                    } catch (e: Exception) {
+                        println("Failed to generate debug keystore: ${e.message}")
+                    }
+                }
+                
                 storeFile = debugConfig.storeFile
                 storePassword = debugConfig.storePassword
                 keyAlias = debugConfig.keyAlias
