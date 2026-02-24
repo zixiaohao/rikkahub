@@ -12,10 +12,10 @@ plugins {
 }
 
 // Conditionally apply Firebase plugins only if google-services.json exists
-def googleServicesFile = file("google-services.json")
+val googleServicesFile = file("google-services.json")
 if (googleServicesFile.exists()) {
-    apply plugin: 'com.google.gms.google-services'
-    apply plugin: 'com.google.firebase.crashlytics'
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 android {
