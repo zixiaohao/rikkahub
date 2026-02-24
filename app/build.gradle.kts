@@ -11,11 +11,62 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-// Conditionally apply Firebase plugins only if google-services.json exists
+// Conditionally apply Firebase plugins only if google-services.json exists and is valid
 val googleServicesFile = file("google-services.json")
+var applyFirebase = false
 if (googleServicesFile.exists()) {
+    try {
+        val content = googleServicesFile.readText()
+        // Simple check to see if it looks like a valid google-services.json
+        if (content.contains("\"project_info\"") && content.contains("\"client\"")) {
+            applyFirebase = true
+        } else {
+            println("google-services.json exists but appears invalid or malformed. Skipping Firebase plugins.")
+        }
+    } catch (e: Exception) {
+        println("Error reading google-services.json: ${e.message}. Skipping Firebase plugins.")
+    }
+}
+
+if (applyFirebase) {
     apply(plugin = "com.google.gms.google-services")
     apply(plugin = "com.google.firebase.crashlytics")
+} else {
+    // Create a dummy google-services.json to satisfy the build if needed by other tasks
+    // but don't apply the plugins that would parse it strictly
+    if (!googleServicesFile.exists()) {
+        googleServicesFile.writeText("""
+            {
+              "project_info": {
+                "project_number": "123456789012",
+                "project_id": "rikkahub-dummy",
+                "storage_bucket": "rikkahub-dummy.appspot.com"
+              },
+              "client": [
+                {
+                  "client_info": {
+                    "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
+                    "android_client_info": {
+                      "package_name": "me.rerere.rikkahub"
+                    }
+                  },
+                  "oauth_client": [],
+                  "api_key": [
+                    {
+                      "current_key": "dummy_key"
+                    }
+                  ],
+                  "services": {
+                    "appinvite_service": {
+                      "other_platform_oauth_client": []
+                    }
+                  }
+                }
+              ],
+              "configuration_version": "1"
+            }
+        """.trimIndent())
+    }
 }
 
 android {
